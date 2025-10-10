@@ -12,6 +12,7 @@
 #undef private
 #include "OverviewPassElement.hpp"
 #include <hyprland/src/render/OpenGL.hpp>
+#include <hyprland/src/config/ConfigDataValues.hpp>
 #include <pango/pangocairo.h>
 #include <cmath>
 
@@ -1120,10 +1121,17 @@ void COverview::fullRender() {
         if (style == "hyprland") {
             const std::string specStr = isFocus ? std::string{*PBGREFOC} : std::string{*PBGRCUR};
             const auto        spec    = parseGradientSpec(specStr);
-            if (spec.valid)
-                renderGradientBorder(box, BWIDTH, spec, roundScaled);
-            else
+            if (spec.valid) {
+                CGradientValueData grad;
+                grad.m_colors.clear();
+                grad.m_colors.push_back(spec.c1);
+                grad.m_colors.push_back(spec.c2);
+                grad.m_angle = spec.angleDeg * (float)M_PI / 180.f;
+                grad.updateColorsOk();
+                g_pHyprOpenGL->renderBorder(box, grad, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
+            } else {
                 g_pHyprOpenGL->renderBorder(box, colFallback, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
+            }
         } else if (style == "hypr") {
             auto tint = [](const CHyprColor& c, float f) -> CHyprColor {
                 auto clamp01 = [](float v) { return std::clamp(v, 0.0f, 1.0f); };
