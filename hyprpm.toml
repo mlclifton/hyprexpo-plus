@@ -1,0 +1,13 @@
+[repository]
+name = "hyprexpo-plus"
+authors = ["sandwich.farm"]
+
+[hyprexpo-plus]
+description = "hyprexpo+ — keyboard selection, labels, gaps, and Hyprland-style borders"
+authors = ["sandwich"]
+output = "hyprexpo.so"
+build = [
+"make all"
+]
+
+since_hyprland = 6066
