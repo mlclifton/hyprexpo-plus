@@ -88,6 +88,15 @@ static SHyprGradientSpec parseGradientSpec(const std::string& inRaw) {
     return spec;
 }
 
+// Helper to detect if a border config string is a gradient or solid color
+static bool isGradientBorderSpec(const std::string& borderSpec) {
+    if (borderSpec.empty())
+        return false;
+    // Check if it contains gradient pattern: rgba(...) rgba(...) deg
+    return borderSpec.find("rgba(") != std::string::npos &&
+           borderSpec.rfind("rgba(") != borderSpec.find("rgba(");
+}
+
 static void renderGradientBorder(const CBox& box, int borderSize, const SHyprGradientSpec& grad, int round = 0) {
     if (!grad.valid || borderSize <= 0)
         return;
@@ -907,14 +916,14 @@ void COverview::fullRender() {
     static auto  const* PLBGSHAPE  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:label_bg_shape")->getDataStaticPtr();
     static auto* const* PLBGPAD    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:label_padding")->getDataStaticPtr();
 
-    static auto* const* PBWIDTH   = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_width")->getDataStaticPtr();
-    static auto* const* PBCURCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current")->getDataStaticPtr();
-    static auto* const* PBFOCCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus")->getDataStaticPtr();
-    static auto* const* PBHOVCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover")->getDataStaticPtr();
-    static auto  const* PBSTYLE   = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_style")->getDataStaticPtr();
-    static auto  const* PBGRCUR   = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_current")->getDataStaticPtr();
-    static auto  const* PBGREFOC  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_focus")->getDataStaticPtr();
-    static auto  const* PBGREHOV  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_hover")->getDataStaticPtr();
+    static auto* const* PBWIDTH      = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_width")->getDataStaticPtr();
+    static auto  const* PBCOLCUR     = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current")->getDataStaticPtr();
+    static auto  const* PBCOLFOC     = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus")->getDataStaticPtr();
+    static auto  const* PBCOLHOV     = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover")->getDataStaticPtr();
+    // Deprecated configs for backwards compatibility
+    static auto  const* PBGRCUR      = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_current")->getDataStaticPtr();
+    static auto  const* PBGREFOC     = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_focus")->getDataStaticPtr();
+    static auto  const* PBGREHOV     = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_hover")->getDataStaticPtr();
 
     // draw labels
     if (**PLABELEN) {
@@ -1112,7 +1121,9 @@ void COverview::fullRender() {
     const int RND_CUR = CURRENT_ROUND_SCALED;
     const int RND_FOC = FOCUS_ROUND_SCALED;
     const int RND_HOV = HOVER_ROUND_SCALED;
-    auto drawBorderForID = [&](int id, int stateType, const CHyprColor& colFallback, const std::string& gradSpec, int roundScaled) {
+
+    // Helper to parse border config (supports rgb/hex/gradient, with deprecated fallback)
+    auto drawBorderForID = [&](int id, const std::string& borderSpec, const std::string& deprecatedGradSpec, int roundScaled) {
         if (id < 0)
             return;
         const int ix = id % SIDE_LENGTH;
@@ -1122,9 +1133,13 @@ void COverview::fullRender() {
         box.round();
         const int BWIDTH = std::max(1, (int)**PBWIDTH);
 
-        const std::string style{*PBSTYLE};
-        if (style == "hyprland") {
-            const auto spec = parseGradientSpec(gradSpec);
+        // Determine which spec to use (prefer new format, fallback to deprecated)
+        std::string effectiveSpec = borderSpec.empty() ? deprecatedGradSpec : borderSpec;
+
+        // Auto-detect format: gradient vs solid color
+        if (isGradientBorderSpec(effectiveSpec)) {
+            // Render as gradient border (hyprland style)
+            const auto spec = parseGradientSpec(effectiveSpec);
             if (spec.valid) {
                 CGradientValueData grad;
                 grad.m_colors.clear();
@@ -1133,48 +1148,37 @@ void COverview::fullRender() {
                 grad.m_angle = spec.angleDeg * (float)M_PI / 180.f;
                 grad.updateColorsOk();
                 g_pHyprOpenGL->renderBorder(box, grad, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
-            } else {
-                g_pHyprOpenGL->renderBorder(box, colFallback, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
             }
-        } else if (style == "hypr") {
-            auto tint = [](const CHyprColor& c, float f) -> CHyprColor {
-                auto clamp01 = [](float v) { return std::clamp(v, 0.0f, 1.0f); };
-                CHyprColor   r;
-                r.r = clamp01(c.r + f);
-                r.g = clamp01(c.g + f);
-                r.b = clamp01(c.b + f);
-                r.a = c.a;
-                return r;
-            };
-            const int l0 = std::max(1, BWIDTH / 3);
-            const int l1 = std::max(1, BWIDTH / 3);
-            const int l2 = std::max(1, BWIDTH - l0 - l1);
-            const int layers[3] = {l0, l1, l2};
-            const CHyprColor cols[3] = {tint(colFallback, 0.12f), colFallback, tint(colFallback, -0.12f)};
+        } else if (!effectiveSpec.empty()) {
+            // Parse as solid color (rgb/hex format)
+            CHyprColor color;
 
-            CBox b = box;
-            int  prev = 0;
-            for (int i = 0; i < 3; ++i) {
-                if (i != 0) {
-                    b.x -= prev;
-                    b.y -= prev;
-                    b.width += prev * 2;
-                    b.height += prev * 2;
+            // Handle rgb() format
+            if (effectiveSpec.find("rgb(") == 0) {
+                // Extract hex from rgb(rrggbb)
+                size_t start = effectiveSpec.find('(');
+                size_t end = effectiveSpec.find(')');
+                if (start != std::string::npos && end != std::string::npos) {
+                    std::string hexStr = effectiveSpec.substr(start + 1, end - start - 1);
+                    // Parse as hex, prepend FF for alpha
+                    color = CHyprColor{(uint64_t)std::stoull("FF" + hexStr, nullptr, 16)};
                 }
-                g_pHyprOpenGL->renderBorder(b, cols[i], {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = layers[i]});
-                prev += layers[i];
+            } else {
+                // Handle 0xAARRGGBB format directly
+                color = CHyprColor{(uint64_t)std::stoull(effectiveSpec, nullptr, 16)};
             }
-        } else {
-            g_pHyprOpenGL->renderBorder(box, colFallback, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
+
+            // Render as simple border
+            g_pHyprOpenGL->renderBorder(box, color, {.round = roundScaled, .roundingPower = ROUND_PWR, .borderSize = BWIDTH});
         }
     };
 
     // Draw borders in order: hover (lowest), then current, then focus (highest priority)
     if (hoveredID != -1 && hoveredID != openedID && hoveredID != kbFocusID)
-        drawBorderForID(hoveredID, 0, CHyprColor{(uint64_t)**PBHOVCOL}, std::string{*PBGREHOV}, RND_HOV);
-    drawBorderForID(openedID, 1, CHyprColor{(uint64_t)**PBCURCOL}, std::string{*PBGRCUR}, RND_CUR);
+        drawBorderForID(hoveredID, std::string{*PBCOLHOV}, std::string{*PBGREHOV}, RND_HOV);
+    drawBorderForID(openedID, std::string{*PBCOLCUR}, std::string{*PBGRCUR}, RND_CUR);
     if (kbFocusID != -1)
-        drawBorderForID(kbFocusID, 2, CHyprColor{(uint64_t)**PBFOCCOL}, std::string{*PBGREFOC}, RND_FOC);
+        drawBorderForID(kbFocusID, std::string{*PBCOLFOC}, std::string{*PBGREFOC}, RND_FOC);
 }
 
 static float lerp(const float& from, const float& to, const float perc) {

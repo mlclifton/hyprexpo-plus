@@ -259,11 +259,16 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     // keyboard navigation + styling
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:keynav_enable", Hyprlang::INT{1});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_style", Hyprlang::STRING{"simple"});
+    // Border configuration - supports both solid colors and gradients
+    // Solid: rgb(rrggbb) or 0xAARRGGBB
+    // Gradient: rgba(rrggbbaa) rgba(rrggbbaa) 45deg
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_width", Hyprlang::INT{2});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current", Hyprlang::INT{0xFF66CCFF});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus", Hyprlang::INT{0xFFFFCC66});
-    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover", Hyprlang::INT{0xFFAABBCC});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color", Hyprlang::STRING{""});           // default border (unused tiles)
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current", Hyprlang::STRING{"rgb(66ccff)"});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus", Hyprlang::STRING{"rgb(ffcc66)"});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover", Hyprlang::STRING{"rgb(aabbcc)"});
+    // Deprecated but supported for backwards compatibility
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_style", Hyprlang::STRING{"simple"});     // ignored, auto-detected from format
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_enable", Hyprlang::INT{1});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_color", Hyprlang::INT{0xFFFFFFFF});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_font_size", Hyprlang::INT{16});
@@ -308,7 +313,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_center_adjust_y", Hyprlang::INT{0});
     // gaps
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:gaps_out", Hyprlang::INT{0});
-    // hyprland-style gradient borders per state (string like: "rgba(33ccffee) rgba(00ff99ee) 45deg")
+    // Deprecated: use border_color_* instead (supports both solid and gradient)
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_current", Hyprlang::STRING{""});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_focus", Hyprlang::STRING{""});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_hover", Hyprlang::STRING{""});
