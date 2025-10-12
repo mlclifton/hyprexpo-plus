@@ -425,12 +425,27 @@ COverview::COverview(PHLWORKSPACE startedOn_, bool swipe_) : startedOn(startedOn
 
     lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
 
+    // Initialize hoveredID based on current mouse position
+    int hx = std::clamp((int)(lastMousePosLocal.x / pMonitor->m_size.x * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+    int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+    hoveredID = hx + hy * SIDE_LENGTH;
+
     auto onCursorMove = [this](void* self, SCallbackInfo& info, std::any param) {
         if (closing)
             return;
 
         info.cancelled    = true;
         lastMousePosLocal = g_pInputManager->getMouseCoordsInternal() - pMonitor->m_position;
+
+        // Update hovered tile
+        int hx = std::clamp((int)(lastMousePosLocal.x / pMonitor->m_size.x * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+        int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
+        int newHoveredID = hx + hy * SIDE_LENGTH;
+
+        if (newHoveredID != hoveredID) {
+            hoveredID = newHoveredID;
+            damage();
+        }
     };
 
     auto onCursorSelect = [this](void* self, SCallbackInfo& info, std::any param) {
@@ -834,10 +849,12 @@ void COverview::fullRender() {
     static auto* const* PTOUNDPWR  = (Hyprlang::FLOAT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_power")->getDataStaticPtr();
     static auto* const* PTILEROUNDF = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_focus")->getDataStaticPtr();
     static auto* const* PTILEROUNDC = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_current")->getDataStaticPtr();
+    static auto* const* PTILEROUNDH = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_hover")->getDataStaticPtr();
 
     const int BASE_ROUND_SCALED   = std::max(0, (int)std::lround((double)**PTILEROUND * pMonitor->m_scale));
     const int FOCUS_ROUND_SCALED  = **PTILEROUNDF >= 0 ? std::max(0, (int)std::lround((double)**PTILEROUNDF * pMonitor->m_scale)) : BASE_ROUND_SCALED;
     const int CURRENT_ROUND_SCALED= **PTILEROUNDC >= 0 ? std::max(0, (int)std::lround((double)**PTILEROUNDC * pMonitor->m_scale)) : BASE_ROUND_SCALED;
+    const int HOVER_ROUND_SCALED  = **PTILEROUNDH >= 0 ? std::max(0, (int)std::lround((double)**PTILEROUNDH * pMonitor->m_scale)) : BASE_ROUND_SCALED;
     const float ROUND_PWR         = **PTOUNDPWR;
 
     // (shadows moved to feature/shadows branch)
@@ -848,12 +865,14 @@ void COverview::fullRender() {
             CBox      texbox{OUTER + x * tileRenderSize.x + x * GAPSIZE, OUTER + y * tileRenderSize.y + y * GAPSIZE, tileRenderSize.x, tileRenderSize.y};
             texbox.scale(pMonitor->m_scale).translate(pos->value());
             texbox.round();
-            // per-tile rounding override for focus/current
+            // per-tile rounding override for focus/current/hover (priority: focus > current > hover)
             int tileRound = BASE_ROUND_SCALED;
             if ((int)id == kbFocusID)
                 tileRound = FOCUS_ROUND_SCALED;
             else if ((int)id == openedID)
                 tileRound = CURRENT_ROUND_SCALED;
+            else if ((int)id == hoveredID)
+                tileRound = HOVER_ROUND_SCALED;
 
             // clamp rounding to tile size
             const int maxCornerPx = std::max(0, (int)std::floor(std::min(texbox.w, texbox.h) / 2.0));
@@ -891,26 +910,23 @@ void COverview::fullRender() {
     static auto* const* PBWIDTH   = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_width")->getDataStaticPtr();
     static auto* const* PBCURCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current")->getDataStaticPtr();
     static auto* const* PBFOCCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus")->getDataStaticPtr();
+    static auto* const* PBHOVCOL  = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover")->getDataStaticPtr();
     static auto  const* PBSTYLE   = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_style")->getDataStaticPtr();
     static auto  const* PBGRCUR   = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_current")->getDataStaticPtr();
     static auto  const* PBGREFOC  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_focus")->getDataStaticPtr();
+    static auto  const* PBGREHOV  = (Hyprlang::STRING const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_hover")->getDataStaticPtr();
 
     // draw labels
     if (**PLABELEN) {
-        // hovered tile (approximate like selectHoveredWorkspace)
-        int hoveredID = -1;
-        if (!closing) {
-            int hx = std::clamp((int)(lastMousePosLocal.x / pMonitor->m_size.x * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
-            int hy = std::clamp((int)(lastMousePosLocal.y / pMonitor->m_size.y * SIDE_LENGTH), 0, SIDE_LENGTH - 1);
-            hoveredID = hx + hy * SIDE_LENGTH;
-        }
+        // use the tracked hoveredID (cleared during closing)
+        const int labelHoveredID = closing ? -1 : hoveredID;
 
         auto shouldShow = [&](int id) -> bool {
             if (std::string{*PLABELSHOW} == "never")
                 return false;
             if (std::string{*PLABELSHOW} == "always")
                 return true;
-            const bool isHover  = id == hoveredID;
+            const bool isHover  = id == labelHoveredID;
             const bool isFocus  = id == kbFocusID;
             const bool isCurr   = id == openedID;
             const std::string mode{*PLABELSHOW};
@@ -931,7 +947,7 @@ void COverview::fullRender() {
                 return 2; // focus
             if (id == openedID)
                 return 3; // current
-            if (id == hoveredID)
+            if (id == labelHoveredID)
                 return 1; // hover
             return 0;     // default
         };
@@ -1090,12 +1106,13 @@ void COverview::fullRender() {
         }
     }
 
-    // draw borders for current and focus (overridden rounding by state below)
+    // draw borders for hover, current and focus (priority order: focus > current > hover)
 
     // pass rounding based on state
     const int RND_CUR = CURRENT_ROUND_SCALED;
     const int RND_FOC = FOCUS_ROUND_SCALED;
-    auto drawBorderForID = [&](int id, bool isFocus, const CHyprColor& colFallback, int roundScaled) {
+    const int RND_HOV = HOVER_ROUND_SCALED;
+    auto drawBorderForID = [&](int id, int stateType, const CHyprColor& colFallback, const std::string& gradSpec, int roundScaled) {
         if (id < 0)
             return;
         const int ix = id % SIDE_LENGTH;
@@ -1107,8 +1124,7 @@ void COverview::fullRender() {
 
         const std::string style{*PBSTYLE};
         if (style == "hyprland") {
-            const std::string specStr = isFocus ? std::string{*PBGREFOC} : std::string{*PBGRCUR};
-            const auto        spec    = parseGradientSpec(specStr);
+            const auto spec = parseGradientSpec(gradSpec);
             if (spec.valid) {
                 CGradientValueData grad;
                 grad.m_colors.clear();
@@ -1153,9 +1169,12 @@ void COverview::fullRender() {
         }
     };
 
-    drawBorderForID(openedID, false, CHyprColor{(uint64_t)**PBCURCOL}, RND_CUR);
+    // Draw borders in order: hover (lowest), then current, then focus (highest priority)
+    if (hoveredID != -1 && hoveredID != openedID && hoveredID != kbFocusID)
+        drawBorderForID(hoveredID, 0, CHyprColor{(uint64_t)**PBHOVCOL}, std::string{*PBGREHOV}, RND_HOV);
+    drawBorderForID(openedID, 1, CHyprColor{(uint64_t)**PBCURCOL}, std::string{*PBGRCUR}, RND_CUR);
     if (kbFocusID != -1)
-        drawBorderForID(kbFocusID, true, CHyprColor{(uint64_t)**PBFOCCOL}, RND_FOC);
+        drawBorderForID(kbFocusID, 2, CHyprColor{(uint64_t)**PBFOCCOL}, std::string{*PBGREFOC}, RND_FOC);
 }
 
 static float lerp(const float& from, const float& to, const float perc) {

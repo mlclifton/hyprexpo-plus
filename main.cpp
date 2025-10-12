@@ -263,6 +263,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_width", Hyprlang::INT{2});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_current", Hyprlang::INT{0xFF66CCFF});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_focus", Hyprlang::INT{0xFFFFCC66});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_color_hover", Hyprlang::INT{0xFFAABBCC});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_enable", Hyprlang::INT{1});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_color", Hyprlang::INT{0xFFFFFFFF});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:label_font_size", Hyprlang::INT{16});
@@ -277,6 +278,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_power", Hyprlang::FLOAT{2.0f});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_focus", Hyprlang::INT{-1});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_current", Hyprlang::INT{-1});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:tile_rounding_hover", Hyprlang::INT{-1});
 
     // (shadows moved to feature/shadows branch)
     // defaults: center/middle within the label container
@@ -309,6 +311,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     // hyprland-style gradient borders per state (string like: "rgba(33ccffee) rgba(00ff99ee) 45deg")
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_current", Hyprlang::STRING{""});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_focus", Hyprlang::STRING{""});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:border_grad_hover", Hyprlang::STRING{""});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:keynav_wrap_h", Hyprlang::INT{1});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:keynav_wrap_v", Hyprlang::INT{1});
     // default off: spatial moves by default
