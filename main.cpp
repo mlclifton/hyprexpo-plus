@@ -299,6 +299,11 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:columns", Hyprlang::INT{3});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:gaps_in", Hyprlang::INT{5});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:bg_col", Hyprlang::INT{0xFF111111});
+    // Supports both global and per-monitor formats:
+    // Global: "center current" or "first 1"
+    // Per-monitor with comma delimiter: "DP-1 first 1, HDMI-1 center current"
+    // Mixed: "DP-1 first 1, center current" (DP-1 uses first 1, others use center current)
+    // Note: hyprexpo_workspace_method keyword takes priority (backwards compatibility)
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:workspace_method", Hyprlang::STRING{"center current"});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprexpo:skip_empty", Hyprlang::INT{0});
 
